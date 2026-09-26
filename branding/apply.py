@@ -4,6 +4,7 @@ Eseguire dalla radice del repo: python3 branding/apply.py"""
 import os, re, shutil, sys
 
 APP = 'WizDesk'
+APP_VERSION = '1.5.1'   # tenere allineato con VERSION in .github/workflows/flutter-build.yml
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 os.chdir(ROOT)
@@ -55,6 +56,26 @@ patch('src/common.rs',
       [(r'(pub fn using_public_server\(\) -> bool \{\n)\s*crate::get_custom_rendezvous_server\(get_option\("custom-rendezvous-server"\)\)\.is_empty\(\)',
         r'\1    false')])
 
+# 8) niente account/cloud RustDesk: nessun server API (login, rubrica, heartbeat)
+patch('src/common.rs',
+      [(r'\n    "https://admin\.rustdesk\.com"\.to_owned\(\)\n\}', '\n    "".to_owned()\n}')])
+patch('libs/hbb_common/src/config.rs',
+      [(r'(pub fn is_disable_account\(\) -> bool \{\n)\s*is_some_hard_opton\("disable-account"\)', r'\1    true'),
+       (r'(pub fn is_disable_ab\(\) -> bool \{\n)\s*is_some_hard_opton\("disable-ab"\)', r'\1    true')])
+
+# 9) versione
+V = APP_VERSION
+patch('Cargo.toml', [(r'(\[package\]\nname = "rustdesk"\nversion = )"[^"]+"', rf'\1"{V}"')])
+patch('libs/portable/Cargo.toml', [(r'(?m)^version = "[^"]+"', f'version = "{V}"')])
+patch('Cargo.lock', [(r'(name = "rustdesk"\nversion = )"[^"]+"', rf'\1"{V}"'),
+                     (r'(name = "rustdesk-portable-packer"\nversion = )"[^"]+"', rf'\1"{V}"')])
+patch('flutter/pubspec.yaml', [(r'(?m)^version: [0-9.]+\+', f'version: {V}+')])
+for f in ['res/rpm-flutter.spec', 'res/rpm.spec', 'res/rpm-flutter-suse.spec', 'res/rpm-suse.spec']:
+    patch(f, [(r'(?m)^Version:(\s+)\S+', rf'Version:\g<1>{V}')], required=False)
+patch('res/PKGBUILD', [(r'(?m)^pkgver=\S+', f'pkgver={V}')], required=False)
+for f in ['appimage/AppImageBuilder-x86_64.yml', 'appimage/AppImageBuilder-aarch64.yml']:
+    patch(f, [(r'(?m)^(\s+version: )[0-9.]+$', rf'\g<1>{V}')], required=False)
+
 if errors:
     print('ERRORI branding:\n  ' + '\n  '.join(errors)); sys.exit(1)
-print(f'branding {APP} applicato')
+print(f'branding {APP} {APP_VERSION} applicato')

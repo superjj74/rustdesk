@@ -49,6 +49,12 @@ patch('flutter/android/app/src/main/AndroidManifest.xml',
 patch('flutter/android/app/src/main/res/values/strings.xml',
       [(r'<string name="app_name">RustDesk</string>', f'<string name="app_name">{APP}</string>')])
 
+# 7) il client usa sempre il server integrato: non trattarlo come "server pubblico"
+#    (altrimenti mostra l'avviso "configura uno specifico server" e limita qualita'/FPS)
+patch('src/common.rs',
+      [(r'(pub fn using_public_server\(\) -> bool \{\n)\s*crate::get_custom_rendezvous_server\(get_option\("custom-rendezvous-server"\)\)\.is_empty\(\)',
+        r'\1    false')])
+
 if errors:
     print('ERRORI branding:\n  ' + '\n  '.join(errors)); sys.exit(1)
 print(f'branding {APP} applicato')

@@ -1,9 +1,7 @@
 name: Flutter Nightly Build
 
 on:
-  schedule:
-    # schedule build every night
-    - cron: "0 0 * * *"
+  # build notturna automatica disattivata: si lancia a mano da Actions -> Run workflow
   workflow_dispatch:
 
 jobs:
@@ -13,3 +11,30 @@ jobs:
     with:
       upload-artifact: true
       upload-tag: "nightly"
+
+  # Rinomina gli installer pubblicati: rustdesk-* -> wizdesk-*
+  rename-release-assets:
+    needs: run-flutter-nightly-build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Rename assets rustdesk-* to wizdesk-*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p work && cd work
+          names=$(gh release view nightly -R "$REPO" --json assets -q '.assets[].name' | grep '^rustdesk' || true)
+          for name in $names; do
+            new="wizdesk${name#rustdesk}"
+            echo "$name -> $new"
+            gh release download nightly -R "$REPO" -p "$name" --clobber
+            mv "$name" "$new"
+            gh release upload nightly -R "$REPO" "$new" --clobber
+            gh release delete-asset nightly -R "$REPO" "$name" -y
+            rm -f "$new"
+          done
+          gh release view nightly -R "$REPO" --json assets -q '.assets[].name'
